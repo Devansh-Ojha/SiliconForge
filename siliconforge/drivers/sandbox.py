@@ -69,18 +69,22 @@ class CoWWorkspaceDriver(BaseStorageDriver):
         if dest.exists():
             shutil.rmtree(dest)
 
-        # On macOS/APFS, cp -c or cp -R creates copy-on-write clone files instantly
-        try:
-            res = subprocess.run(
-                ["cp", "-Rc", str(src), str(dest)],
-                capture_output=True,
-                check=False
-            )
-            if res.returncode != 0:
-                # Fallback to copytree with hardlinks or standard recursive copy
-                shutil.copytree(src, dest, copy_function=os.link)
-        except Exception:
-            shutil.copytree(src, dest)
+        # Try copy-on-write clone:
+        # On Linux: cp -a --reflink=auto
+        # On macOS: cp -Rc
+        cloned = False
+        for cmd in [["cp", "-a", "--reflink=auto", str(src), str(dest)], ["cp", "-Rc", str(src), str(dest)]]:
+            try:
+                res = subprocess.run(cmd, capture_output=True, check=False)
+                if res.returncode == 0:
+                    cloned = True
+                    break
+            except Exception:
+                pass
+
+        if not cloned:
+            # Fallback to standard directory copy (NOT os.link which mutates parent upon child write)
+            shutil.copytree(src, dest, symlinks=True)
 
         self.node_paths[new_node_id] = dest
         return dest
