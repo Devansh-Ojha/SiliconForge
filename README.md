@@ -20,11 +20,12 @@ Think: VM and container infrastructure + Hardware toolchains + Autonomous AI age
 
 ## Key Architectural Capabilities
 
-- **Sub-second Copy-on-Write Snapshots**: Near-instantaneous workspace branching using APFS clones (macOS), Linux reflinks (Btrfs/XFS/ZFS), or Firecracker microVM snapshots.
+- **Sub-second Copy-on-Write Snapshots**: Near-instantaneous workspace branching (5.50 ms) using APFS clones (macOS), Linux reflinks (Btrfs/XFS), or Firecracker microVM snapshots.
 - **Experiment DAG & Multi-Objective Pareto Frontier**: Tracks every micro-architectural exploration branch. Automatically filters out functional simulation bugs and ranks valid designs across timing slack (Worst Negative Slack, WNS) and cell area.
+- **Waveform Anomaly & Temporal Slicing**: Compresses multi-megabyte VCD simulation waveforms by 94.96% into focused ASCII timing diagrams centered on the exact assertion failure cycle.
 - **Structured EDA Telemetry Bus**: Transforms noisy compiler and synthesis outputs (Verilator, Yosys, OpenROAD) into structured, compact JSON schemas tailored for LLM reasoning windows.
 - **Deterministic Rollback**: If an agent introduces a hazard bug, syntax fault, or timing violation, SiliconForge instantly rolls back to the parent checkpoint without polluting the workspace.
-- **Isolated Execution Sandboxes**: Supports Firecracker microVMs over Unix domain sockets (`vsock`) with KVM hardware acceleration, as well as lightweight local isolation for development.
+- **Interactive Web Dashboard**: Embedded zero-dependency web visualizer serving live Chart.js 2D Pareto frontier scatter plots and clickable DAG lineages.
 
 ---
 
@@ -53,7 +54,7 @@ Think: VM and container infrastructure + Hardware toolchains + Autonomous AI age
                  │  - Verilator (C++ Cycle-Accurate Sim)           │
                  │  - Yosys (Logic Synthesis & Gate Counts)        │
                  │  - OpenROAD (Physical Design & STA Timing)      │
-                 │  - Telemetry Parsers (WNS, Area, Assertions)    │
+                 │  - Telemetry & Waveform Slicing Engine          │
                  └─────────────────────────────────────────────────┘
 ```
 
@@ -102,6 +103,17 @@ siliconforge run-demo
 
 ---
 
+## Curated Benchmark Suite
+
+SiliconForge includes reproducible, self-contained hardware verification tasks:
+
+| Benchmark | Directory | Description | Planted Failure Mode |
+| :--- | :--- | :--- | :--- |
+| **01 RISC-V Hazard Unit** | `benchmarks/01_riscv_hazard/` | 5-stage pipeline forwarding & stall unit | RAW conflict: MEM forwarding fails to yield to EX stage |
+| **02 Asynchronous CDC FIFO** | `benchmarks/02_cdc_fifo/` | Dual-clock Gray-code pointer synchronizer | Faulty Gray-to-binary check asserts premature `wfull` |
+
+---
+
 ## CLI Usage
 
 ```bash
@@ -116,13 +128,14 @@ siliconforge run-demo
 
 ## Testing
 
-SiliconForge includes a comprehensive unit test suite covering the Experiment DAG, telemetry parsers, synthesis scripts, hypervisor detection, and agent rollback loops:
+SiliconForge includes an automated unit test suite covering the Experiment DAG, telemetry parsers, waveform slicer, web dashboard, and agent rollback loops:
 
 ```bash
-# Run core test suite
+# Run complete test suite
 PYTHONPATH=. python3 tests/test_siliconforge.py
 PYTHONPATH=. python3 tests/test_vmm_synthesis.py
 PYTHONPATH=. python3 tests/test_agent.py
+PYTHONPATH=. python3 tests/test_telemetry_ui.py
 ```
 
 ---
@@ -143,13 +156,19 @@ SiliconForge/
 │   │   └── firecracker.py    # MicroVM manager & REST API bindings
 │   ├── telemetry/
 │   │   ├── parsers.py        # Verilator, Yosys & OpenROAD telemetry parsers
-│   │   └── synthesis.py      # Automated Yosys synthesis scripting engine
+│   │   ├── synthesis.py      # Automated Yosys synthesis scripting engine
+│   │   └── waveform.py       # VCD anomaly detection & temporal waveform slicer
+│   ├── ui/
+│   │   └── server.py         # Zero-dependency embedded web dashboard server
 │   ├── agent/
 │   │   ├── hardware_agent.py # AutonomousHardwareAgent with rollback loop
 │   │   └── llm_policy.py     # LLM provider connector & EDA prompt templates
 │   └── cli/
 │       ├── main.py           # CLI entrypoint (siliconforge)
 │       └── visualizer.py     # Rich terminal DAG visualizer
+├── benchmarks/
+│   ├── 01_riscv_hazard/      # RISC-V hazard detection & forwarding task
+│   └── 02_cdc_fifo/          # Clock domain crossing FIFO synchronization task
 ├── guest-images/
 │   ├── Dockerfile.eda        # Complete open-source EDA rootfs
 │   └── build-rootfs.sh       # Script to build minimal ext4 images for Firecracker
