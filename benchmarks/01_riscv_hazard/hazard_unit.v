@@ -1,6 +1,6 @@
 // Benchmark 01: RISC-V Hazard Detection & Forwarding Unit
 // Contains a planted bug where EX/MEM hazard priority fails to override ID/EX hazard
-module riscv_hazard_unit (
+module hazard_unit (
     input  wire [4:0] id_rs1,
     input  wire [4:0] id_rs2,
     input  wire [4:0] ex_rd,
